@@ -211,25 +211,30 @@ public class XProcURIResolver implements URIResolver, EntityResolver, ModuleURIR
 
         if (source == null) {
             try {
-                URI baseURI = new URI(base);
-                URI resURI = baseURI.resolve(href);
-
-                String path = baseURI.toASCIIString();
-                int pos = path.indexOf("!");
-                if (pos > 0 && (path.startsWith("jar:file:") || path.startsWith("jar:http:") || path.startsWith("jar:https:"))) {
-                    // You can't resolve() against jar: scheme URIs because they appear to be opaque.
-                    // I wonder if what follows is kosher...
-                    String fakeURIstr = "http://example.com";
-                    String subpath = path.substring(pos+1);
-                    if (subpath.startsWith("/")) {
-                        fakeURIstr += subpath;
-                    } else {
-                        fakeURIstr += "/" + subpath;
+                URI resURI; {
+                    resURI = new URI(href);
+                    if (!resURI.isAbsolute()) {
+                        URI baseURI = new URI(base);
+                        String path = baseURI.toASCIIString();
+                        int pos = path.indexOf("!");
+                        if (pos > 0 && (path.startsWith("jar:file:") || path.startsWith("jar:http:") || path.startsWith("jar:https:"))) {
+                            // You can't resolve() against jar: scheme URIs because they appear to be opaque.
+                            // I wonder if what follows is kosher...
+                            String fakeURIstr = "http://example.com";
+                            String subpath = path.substring(pos+1);
+                            if (subpath.startsWith("/")) {
+                                fakeURIstr += subpath;
+                            } else {
+                                fakeURIstr += "/" + subpath;
+                            }
+                            URI fakeURI = new URI(fakeURIstr);
+                            resURI = fakeURI.resolve(href);
+                            fakeURIstr = path.substring(0,pos+1) + resURI.getPath();
+                            resURI = new URI(fakeURIstr);
+                        } else {
+                            resURI = baseURI.resolve(href);
+                        }
                     }
-                    URI fakeURI = new URI(fakeURIstr);
-                    resURI = fakeURI.resolve(href);
-                    fakeURIstr = path.substring(0,pos+1) + resURI.getPath();
-                    resURI = new URI(fakeURIstr);
                 }
 
                 source = new SAXSource(new InputSource(resURI.toASCIIString()));
