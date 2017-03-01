@@ -35,7 +35,7 @@ import java.util.Iterator;
  */
 public class XML {
 
-    /** The Character '&'. */
+    /** The Character '&amp;'. */
     public static final Character AMP   = new Character('&');
 
     /** The Character '''. */
@@ -47,10 +47,10 @@ public class XML {
     /** The Character '='. */
     public static final Character EQ    = new Character('=');
 
-    /** The Character '>'. */
+    /** The Character '&gt;'. */
     public static final Character GT    = new Character('>');
 
-    /** The Character '<'. */
+    /** The Character '&lt;'. */
     public static final Character LT    = new Character('<');
 
     /** The Character '?'. */
@@ -64,12 +64,12 @@ public class XML {
 
     /**
      * Replace special characters with XML escapes:
-     * <pre>
-     * &amp; <small>(ampersand)</small> is replaced by &amp;amp;
-     * &lt; <small>(less than)</small> is replaced by &amp;lt;
-     * &gt; <small>(greater than)</small> is replaced by &amp;gt;
-     * &quot; <small>(double quote)</small> is replaced by &amp;quot;
-     * </pre>
+     * <ul>
+     * <li> &amp; <small>(ampersand)</small> is replaced by &amp;amp; </li>
+     * <li> &lt; <small>(less than)</small> is replaced by &amp;lt; </li>
+     * <li> &gt; <small>(greater than)</small> is replaced by &amp;gt; </li>
+     * <li> &quot; <small>(double quote)</small> is replaced by &amp;quot; </li>
+     * </ul>
      * @param string The string to be escaped.
      * @return The escaped string.
      */
@@ -294,7 +294,7 @@ public class XML {
      * does not like to distinguish between elements and attributes.
      * Sequences of similar elements are represented as JSONArrays. Content
      * text may be placed in a "content" member. Comments, prologs, DTDs, and
-     * <code>&lt;[ [ ]]></code> are ignored.
+     * <code>&lt;[ [ ]]&gt;</code> are ignored.
      * @param string The source string.
      * @return A JSONObject containing the structured data from the XML string.
      * @throws JSONException

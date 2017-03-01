@@ -76,7 +76,7 @@ import java.util.TreeSet;
  *     <code>{ } [ ] / \ : , = ; #</code> and if they do not look like numbers
  *     and if they are not the reserved words <code>true</code>,
  *     <code>false</code>, or <code>null</code>.</li>
- * <li>Keys can be followed by <code>=</code> or <code>=></code> as well as
+ * <li>Keys can be followed by <code>=</code> or <code>=&gt;</code> as well as
  *     by <code>:</code>.</li>
  * <li>Values can be followed by <code>;</code> <small>(semicolon)</small> as
  *     well as by <code>,</code> <small>(comma)</small>.</li>
@@ -157,7 +157,7 @@ public class JSONObject {
      * @throws JSONException 
      * @exception JSONException If a value is a non-finite number or if a name is duplicated.
      */
-    public JSONObject(JSONObject jo, String[] names) {
+    public JSONObject(JSONObject jo, String[] names) throws JSONException {
         this();
         for (int i = 0; i < names.length; i += 1) {
         	try {
@@ -236,7 +236,7 @@ public class JSONObject {
      *  the JSONObject.
      * @throws JSONException 
      */
-    public JSONObject(Map<String, ?> map) {
+    public JSONObject(Map<String, ?> map) throws JSONException {
         this.map = new HashMap<String, Object>();
         if (map != null) {
             for (Map.Entry<String, ?> e : map.entrySet()) {
@@ -1092,7 +1092,7 @@ public class JSONObject {
 
     /**
      * Produce a string in double quotes with backslash sequences in all the
-     * right places. A backslash will be inserted within </, allowing JSON
+     * right places. A backslash will be inserted within &lt;/, allowing JSON
      * text to be delivered in HTML. In JSON text, a string cannot contain a
      * control character or an unescaped quote or backslash.
      * @param string A String

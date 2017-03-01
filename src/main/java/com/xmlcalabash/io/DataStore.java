@@ -51,7 +51,7 @@ import java.net.URI;
  * <li>pxp:zip</li>
  * </ul>
  * 
- * @author James Leigh <james@3roundstones.com>
+ * @author James Leigh &lt;james@3roundstones.com&gt;
  * 
  */
 public interface DataStore {
