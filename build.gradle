@@ -79,6 +79,8 @@ dependencies {
     [group: 'org.slf4j', name: 'slf4j-api', version: '1.7.10'],
     [group: 'org.xmlresolver', name: 'xmlresolver', version: '0.12.3'],
     [group: 'org.osgi', name: 'org.osgi.core', version: '4.3.1'],
+    // OSGi bundle that provides isorelax (which is a dependency of net.java.dev.msv, needed for validate-rng)
+    [group: 'com.sun.xml.bind', name: 'jaxb-extra-osgi', version: '2.2.11'],
   )
 
   reportruntime (
@@ -131,6 +133,7 @@ task copyLib(type: Copy) {
   FileCollection runtime  = configurations.runtime
   FileCollection localLib = fileTree(dir: 'lib').include("*.jar")
   FileCollection lib = runtime - localLib
+  lib = lib.filter { File f -> !(f.name ==~ /.*osgi.*/) }
   String path = ""
   lib.each {
     File file -> path += " lib/" + file.name
@@ -151,15 +154,28 @@ jar {
     instruction 'Implementation-Version', project.ext.distVersion
     instruction 'Main-Class', 'com.xmlcalabash.drivers.Main'
     instruction 'Bundle-RequiredExecutionEnvironment', 'J2SE-1.6'
-    instruction 'Export-Package', 'com.xmlcalabash.*;version=' + project.ext.osgiVersion + ', etc'
+    instruction 'Export-Package', 'com.xmlcalabash.*;version=' + project.ext.osgiVersion + ',\
+  com.nwalsh.annotations,\
+  org.xmlresolver,\
+  etc'
     instruction 'Import-Package', 'net.sf.saxon.*;version=' + project.ext.saxonRelease + ',\
   javax.crypto.*,\
   javax.xml.*,\
   org.apache.commons.httpclient.*,\
   org.xml.sax.*,\
+  !org.osgi.*,\
+  !com.xmlcalabash.*,\
+  !com.nwalsh.annotations,\
+  !org.xmlresolver,\
   *;resolution:=optional'
     instruction 'DynamicImport-Package', '*'
     instruction 'Class-Path', project.ext.runtimeClasspath + " lib"
+    instruction 'Bundle-ClassPath', '.,lib/nwalsh-annotations.jar,lib/xmlresolver.jar'
+  }
+  from('build/dist') {
+    include 'lib/nwalsh-annotations-*.jar'
+    include 'lib/xmlresolver-*.jar'
+    rename '(.*)-.*.jar','$1.jar'
   }
 }
 
