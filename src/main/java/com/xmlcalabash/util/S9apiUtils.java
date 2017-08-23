@@ -93,7 +93,13 @@ public class S9apiUtils {
         try {
             Configuration config = proc.getUnderlyingConfiguration();
             PipelineConfiguration pipeConfig = config.makePipelineConfiguration();
-
+            XProcLocationProvider locationProvider; {
+                if (baseURI != null && config.isLineNumbering()) {
+                    locationProvider = new XProcLocationProvider();
+                    pipeConfig.setLocationProvider(locationProvider);
+                } else
+                    locationProvider = null;
+            }
             Receiver out = destination.getReceiver(config);
             out = new NamespaceReducer(out);
             TreeReceiver tree = new TreeReceiver(out);
@@ -104,8 +110,18 @@ public class S9apiUtils {
             tree.open();
             tree.startDocument(0);
             for (XdmValue value : values) {
+                int locationId; {
+                    if (locationProvider != null) {
+                        int lineNumber = value instanceof XdmNode ? ((XdmNode)value).getLineNumber() : -1;
+                        if (lineNumber > 0)
+                            locationId = locationProvider.allocateLocation(baseURI.toASCIIString(), lineNumber);
+                        else
+                            locationId = 0;
+                    } else
+                        locationId = 0;
+                }
                 for (XdmItem item : (Iterable<XdmItem>) value) {
-                    tree.append((Item) item.getUnderlyingValue(), 0,
+                    tree.append((Item) item.getUnderlyingValue(), locationId,
                             NodeInfo.ALL_NAMESPACES);
                 }
             }
@@ -121,7 +137,13 @@ public class S9apiUtils {
             Processor proc = runtime.getProcessor();
             Configuration config = proc.getUnderlyingConfiguration();
             PipelineConfiguration pipeConfig = config.makePipelineConfiguration();
-
+            XProcLocationProvider locationProvider; {
+                if (baseURI != null && config.isLineNumbering()) {
+                    locationProvider = new XProcLocationProvider();
+                    pipeConfig.setLocationProvider(locationProvider);
+                } else
+                    locationProvider = null;
+            }
             Receiver out = destination.getReceiver(config);
             out = new NamespaceReducer(out);
             TreeReceiver tree = new TreeReceiver(out);
@@ -131,7 +153,17 @@ public class S9apiUtils {
             }
             tree.open();
             tree.startDocument(0);
-            tree.append((Item) node.getUnderlyingValue(), 0, NodeInfo.ALL_NAMESPACES);
+            int locationId; {
+                if (locationProvider != null) {
+                    int lineNumber = node instanceof XdmNode ? ((XdmNode)node).getLineNumber() : -1;
+                    if (lineNumber > 0)
+                        locationId = locationProvider.allocateLocation(baseURI.toASCIIString(), lineNumber);
+                    else
+                        locationId = 0;
+                } else
+                    locationId = 0;
+            }
+            tree.append((Item) node.getUnderlyingValue(), locationId, NodeInfo.ALL_NAMESPACES);
             tree.endDocument();
             tree.close();
         } catch (XPathException err) {
@@ -359,7 +391,7 @@ public class S9apiUtils {
                 }
             }
 
-            tree.addStartElement(newName, inode.getSchemaType(), newNS);
+            tree.addStartElement(newName, inode.getSchemaType(), newNS, node.getLineNumber());
 
             if (!preserveUsed) {
                 // In this case, we may need to change some attributes too

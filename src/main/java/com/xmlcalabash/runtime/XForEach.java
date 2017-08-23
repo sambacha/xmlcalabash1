@@ -114,7 +114,11 @@ public class XForEach extends XCompoundStep {
                 }
 
                 for (XStep step : subpipeline) {
-                    step.run();
+                    try {
+                        step.run();
+                    } catch (Throwable e) {
+                        throw handleException(e);
+                    }
                 }
 
                 for (String port : inputs.keySet()) {

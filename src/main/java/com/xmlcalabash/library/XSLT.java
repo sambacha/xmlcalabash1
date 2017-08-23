@@ -22,7 +22,9 @@ package com.xmlcalabash.library;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Vector;
 import javax.xml.transform.ErrorListener;
 import javax.xml.transform.Result;
@@ -33,6 +35,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.sax.SAXSource;
+import javax.xml.transform.SourceLocator;
 
 import com.xmlcalabash.core.XMLCalabash;
 import com.xmlcalabash.core.XProcException;
@@ -48,6 +51,7 @@ import com.xmlcalabash.util.S9apiUtils;
 import net.sf.saxon.Configuration;
 import net.sf.saxon.lib.CollectionURIResolver;
 import net.sf.saxon.lib.OutputURIResolver;
+import net.sf.saxon.lib.StandardErrorListener;
 import net.sf.saxon.lib.UnparsedTextURIResolver;
 import net.sf.saxon.s9api.DocumentBuilder;
 import net.sf.saxon.s9api.QName;
@@ -63,6 +67,11 @@ import net.sf.saxon.s9api.MessageListener;
 import net.sf.saxon.s9api.ValidationMode;
 import net.sf.saxon.s9api.Processor;
 import net.sf.saxon.event.Receiver;
+import net.sf.saxon.expr.Expression;
+import net.sf.saxon.expr.FunctionCall;
+import net.sf.saxon.expr.instruct.Template;
+import net.sf.saxon.expr.instruct.TerminationException;
+import net.sf.saxon.expr.instruct.Instruction;
 import com.xmlcalabash.runtime.XAtomicStep;
 import org.xml.sax.InputSource;
 
@@ -224,7 +233,8 @@ public class XSLT extends DefaultStep {
             if (document != null) {
                 transformer.setInitialContextNode(document);
             }
-            transformer.setMessageListener(new CatchMessages());
+            CatchMessages catchMessages = new CatchMessages();
+            transformer.setMessageListener(catchMessages);
             result = new XdmDestination();
             transformer.setDestination(result);
 
@@ -248,7 +258,48 @@ public class XSLT extends DefaultStep {
 
             transformer.setSchemaValidationMode(ValidationMode.DEFAULT);
             transformer.getUnderlyingController().setUnparsedTextURIResolver(unparsedTextURIResolver);
-            transformer.transform();
+            try {
+                transformer.transform();
+            } catch (SaxonApiException sae) {
+                final Throwable e = sae.getCause();
+                if (e instanceof TransformerException) {
+                    String message = e.getMessage();
+                    if (e instanceof TerminationException) {
+                        message = catchMessages.getTerminatingMessage().toString();
+                    }
+                    SourceLocator loc = ((TransformerException)e).getLocator();
+                    String instructionName; {
+                        if (loc instanceof Instruction)
+                            instructionName = StandardErrorListener.getInstructionName(((Instruction)loc));
+                        else if (loc instanceof FunctionCall)
+                            instructionName = ((FunctionCall)loc).getFunctionName().toString();
+                        else if (loc instanceof Template)
+                            instructionName = ((Template)loc).getTemplateName().toString();
+                        else
+                            instructionName = null;
+                    }
+                    final SourceLocator[] location = new SourceLocator[] {
+                        XProcException.prettyLocator(loc, instructionName)
+                    };
+                    Throwable cause = e.getCause();
+                    if (cause != null) {
+                        if (cause instanceof XProcException)
+                            throw ((XProcException)cause).rebaseOnto(location);
+                        else
+                            throw new XProcException(message, XProcException.javaError(cause, 0)) {
+                                @Override
+                                public SourceLocator[] getLocator() {
+                                    return location; }};
+                    } else
+                        // passing e in order to provide some more details
+                        // (but not wrapping it in an XProcException so that it doesn't appear in locator)
+                        throw new XProcException(message, e) {
+                            @Override
+                            public SourceLocator[] getLocator() {
+                                return location; }};
+                } else
+                    throw XProcException.javaError(sae, 0);
+            }
         } finally {
             config.setOutputURIResolver(uriResolver);
             config.setCollectionURIResolver(collectionResolver);
@@ -404,22 +455,29 @@ public class XSLT extends DefaultStep {
     }
 
     class CatchMessages implements MessageListener {
-        public CatchMessages() {
-        }
+        
+        XdmNode terminatingMessage = null;
 
-        public void message(XdmNode content, boolean terminate, javax.xml.transform.SourceLocator locator) {
+        public void message(XdmNode content, boolean terminate, SourceLocator locator) {
             TreeWriter treeWriter = new TreeWriter(runtime);
             treeWriter.startDocument(content.getBaseURI());
             treeWriter.addStartElement(XProcConstants.c_error);
             treeWriter.startContent();
-
             treeWriter.addSubtree(content);
-
             treeWriter.addEndElement();
             treeWriter.endDocument();
 
             step.reportError(treeWriter.getResult());
-            step.info(step.getNode(), content.toString());
+
+            if (!terminate)
+                step.info(step.getNode(), content.toString());
+
+            if (terminate)
+                terminatingMessage = content;
+        }
+
+        public XdmNode getTerminatingMessage() {
+            return terminatingMessage;
         }
     }
 

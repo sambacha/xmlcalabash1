@@ -130,13 +130,13 @@ public class XViewport extends XCompoundStep implements ProcessMatchingNodes {
             inScopeOptions.put(var.getName(), value);
         }
 
-        try {
-            for (XStep step : subpipeline) {
-                step.reset();
+        for (XStep step : subpipeline) {
+            step.reset();
+            try {
                 step.run();
+            } catch (Throwable e) {
+                throw handleException(e);
             }
-        } catch (SaxonApiException sae) {
-            throw new XProcException(sae);
         }
 
 

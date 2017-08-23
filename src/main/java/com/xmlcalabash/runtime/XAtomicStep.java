@@ -386,7 +386,11 @@ public class XAtomicStep extends XStep {
 
         runtime.start(this);
         try {
-            xstep.run();
+            try {
+                xstep.run();
+            } catch (Throwable e) {
+                throw handleException(e);
+            }
 
             // FIXME: Is it sufficient to only do this for atomic steps?
             String cache = getInheritedExtensionAttribute(XProcConstants.cx_cache);
@@ -414,7 +418,6 @@ public class XAtomicStep extends XStep {
                 WritablePipe wpipe = outputs.get(port);
                 wpipe.close(); // Indicate we're done
             }
-            
             runtime.finish(this);
             data.closeFrame();
         }

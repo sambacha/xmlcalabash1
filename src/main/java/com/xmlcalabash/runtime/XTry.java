@@ -25,8 +25,12 @@ import java.util.Vector;
  * To change this template use File | Settings | File Templates.
  */
 public class XTry extends XCompoundStep {
+    private static final String NS_DAISY_PIPELINE_XPROC = "http://www.daisy.org/ns/pipeline/xproc";
     private static final QName c_errors = new QName("c", XProcConstants.NS_XPROC_STEP, "errors");
     private static final QName c_error = new QName("c", XProcConstants.NS_XPROC_STEP, "error");
+    private static final QName px_location = new QName("px", NS_DAISY_PIPELINE_XPROC, "location");
+    private static final QName px_file = new QName("px", NS_DAISY_PIPELINE_XPROC, "file");
+    private static final QName px_cause = new QName("px", NS_DAISY_PIPELINE_XPROC, "cause");
     private static QName _href = new QName("", "href");
     private static QName _line = new QName("", "line");
     private static QName _column = new QName("", "column");
@@ -97,6 +101,9 @@ public class XTry extends XCompoundStep {
         try {
             xgroup.run();
         } catch (Exception xe) {
+            
+            logger.debug("p:try: caught error: ", xe);
+            
             TreeWriter treeWriter = new TreeWriter(runtime);
             treeWriter.startDocument(step.getNode().getBaseURI());
             treeWriter.addStartElement(c_errors);
@@ -115,56 +122,7 @@ public class XTry extends XCompoundStep {
 
             if (!reported) {
                 // Hey, no one reported this exception. We better do it.
-                treeWriter.addStartElement(c_error);
-
-                String message = xe.getMessage();
-                StructuredQName qCode = null;
-
-                if (xe instanceof XPathException) {
-                    XPathException xxx = (XPathException) xe;
-                    qCode = xxx.getErrorCodeQName();
-
-                    Throwable underlying = xe.getCause();
-                    if (underlying != null) {
-                        message = underlying.toString();
-                    }
-                }
-
-                if (xe instanceof XProcException) {
-                    XProcException xxx = (XProcException) xe;
-                    QName code = xxx.getErrorCode();
-                    message = xxx.getMessage();
-                    Throwable underlying = xe.getCause();
-                    if (underlying != null) {
-                        message = underlying.getMessage();
-                    }
-                    if (code != null) {
-                        qCode = new StructuredQName(code.getPrefix(), code.getNamespaceURI(), code.getLocalName());
-                    }
-                }
-
-                if (qCode != null) {
-                    treeWriter.addNamespace(qCode.getPrefix(), qCode.getNamespaceBinding().getURI());
-                    treeWriter.addAttribute(_code, qCode.getDisplayName());
-                }
-
-                XStep step = runtime.runningStep();
-                if (step != null && step.getNode() != null) {
-                    XdmNode node = step.getNode();
-                    if (node.getBaseURI() != null) {
-                        treeWriter.addAttribute(_href, node.getBaseURI().toString());
-                    }
-                    if (node.getLineNumber() > 0) {
-                        treeWriter.addAttribute(_line, ""+node.getLineNumber());
-                    }
-                    if (node.getColumnNumber() > 0) {
-                        treeWriter.addAttribute(_column, ""+node.getColumnNumber());
-                    }
-                }
-
-                treeWriter.startContent();
-                treeWriter.addText(message);
-                treeWriter.addEndElement();
+                serializeError(xe, runtime.runningStep(), treeWriter);
             }
 
             treeWriter.addEndElement();
@@ -188,6 +146,84 @@ public class XTry extends XCompoundStep {
 
             xcatch.run();
         }
+    }
+
+    private static void serializeError(Throwable xe, XStep step, TreeWriter treeWriter) {
+        treeWriter.addStartElement(c_error);
+
+        String message = xe.getMessage();
+        StructuredQName qCode = null;
+
+        if (xe instanceof XPathException) {
+            XPathException xxx = (XPathException) xe;
+            qCode = xxx.getErrorCodeQName();
+
+            Throwable underlying = xe.getCause();
+            if (underlying != null) {
+                message = underlying.toString();
+            }
+        }
+
+        if (xe instanceof XProcException) {
+            XProcException xxx = (XProcException) xe;
+            QName code = xxx.getErrorCode();
+            if (code != null) {
+                qCode = new StructuredQName(code.getPrefix(), code.getNamespaceURI(), code.getLocalName());
+            }
+            if (message == null) {
+                Throwable underlying = xe.getCause();
+                if (underlying != null && !(underlying instanceof XProcException)) {
+                    message = underlying.getMessage();
+                }
+            }
+        }
+
+        if (qCode != null) {
+            treeWriter.addNamespace(qCode.getPrefix(), qCode.getNamespaceBinding().getURI());
+            treeWriter.addAttribute(_code, qCode.getDisplayName());
+        }
+
+        if (step != null && step.getNode() != null) {
+            XdmNode node = step.getNode();
+            if (node.getBaseURI() != null) {
+                treeWriter.addAttribute(_href, node.getBaseURI().toString());
+            }
+            if (node.getLineNumber() > 0) {
+                treeWriter.addAttribute(_line, ""+node.getLineNumber());
+            }
+            if (node.getColumnNumber() > 0) {
+                treeWriter.addAttribute(_column, ""+node.getColumnNumber());
+            }
+        }
+
+        treeWriter.startContent();
+        
+        if (message != null)
+            treeWriter.addText(message);
+
+        if (xe instanceof XProcException) {
+            XProcException xxx = (XProcException) xe;
+            treeWriter.addStartElement(px_location);
+            treeWriter.startContent();
+            for (SourceLocator l : xxx.getLocator()) {
+                treeWriter.addStartElement(px_file);
+                treeWriter.addAttribute(_href, l.getSystemId());
+                int line = l.getLineNumber();
+                if (line > 0)
+                    treeWriter.addAttribute(_line, ""+line);
+                treeWriter.addEndElement();
+            }
+            treeWriter.addEndElement();
+            Throwable underlying = xe.getCause();
+            if (underlying != null && underlying instanceof XProcException) {
+                treeWriter.addStartElement(px_cause);
+                treeWriter.startContent();
+                serializeError(underlying, null, treeWriter);
+                treeWriter.addEndElement();
+            }
+        }
+
+        treeWriter.addEndElement();
     }
 
     public void reportError(XdmNode doc) {
