@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 
 import javax.xml.transform.SourceLocator;
 
+import com.xmlcalabash.core.XProcConstants;
 import com.xmlcalabash.core.XProcException;
 import com.xmlcalabash.core.XProcMessageListener;
 import com.xmlcalabash.core.XProcRuntime;
@@ -54,6 +55,7 @@ public class XProcMessageListenerHelper {
 	private static final String NS_DAISY_PIPELINE_XPROC = "http://www.daisy.org/ns/pipeline/xproc";
 
 	private static final QName px_message = new QName("px", NS_DAISY_PIPELINE_XPROC, "message");
+	private static final QName cx_message = new QName("cx", XProcConstants.NS_CALABASH_EX, "message");
 	private static final QName px_message_severity = new QName("px", NS_DAISY_PIPELINE_XPROC, "message-severity");
 	private static final QName px_progress = new QName("px", NS_DAISY_PIPELINE_XPROC, "progress");
 
@@ -61,6 +63,9 @@ public class XProcMessageListenerHelper {
 
 	public static void openStep(XProcRuntime runtime, XStep step) {
 		String msg = evaluateExtensionAttribute(px_message, runtime, step);
+		if (msg == null) {
+			msg = evaluateExtensionAttribute(cx_message, runtime, step);
+		}
 		BigDecimal portion; {
 			String s = evaluateExtensionAttribute(px_progress, runtime, step);
 			if (s == null)
