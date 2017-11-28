@@ -27,6 +27,8 @@ public interface XProcMessageListener {
      * Begin a new step, which is either
      * - a p:group (except within a p:try),
      * - a p:choose,
+     * - a p:when,
+     * - a p:otherwise,
      * - a p:try,
      * - a p:for-each,
      * - a p:viewport,
@@ -35,7 +37,9 @@ public interface XProcMessageListener {
      *
      * @param message  A message associated with the step (may be null)
      * @param level    The severity level of the message (may be null)
-     * @param portion  The portion of this step within its parent step in terms of computation time (number between 0 and 1)
+     * @param portion  The portion of this step within its parent step in terms of
+     *                 computation time (number between 0 and 1, for p:when and
+     *                 p:otherwise always equal to 1)
      */
     public void openStep(XProcRunnable step, XdmNode node, String message, String level, BigDecimal portion);
     /**

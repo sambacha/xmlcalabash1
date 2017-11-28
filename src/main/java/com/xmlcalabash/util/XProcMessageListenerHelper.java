@@ -62,13 +62,22 @@ public class XProcMessageListenerHelper {
 	private static final Logger logger = LoggerFactory.getLogger(XProcMessageListenerHelper.class);
 
 	public static void openStep(XProcRuntime runtime, XStep step) {
+		openStep(runtime, step, null);
+	}
+	
+	public static void openStep(XProcRuntime runtime, XStep step, BigDecimal fixedPortion) {
 		String msg = evaluateExtensionAttribute(px_message, runtime, step);
 		if (msg == null) {
 			msg = evaluateExtensionAttribute(cx_message, runtime, step);
 		}
 		BigDecimal portion; {
 			String s = evaluateExtensionAttribute(px_progress, runtime, step);
-			if (s == null)
+			if (fixedPortion != null) {
+				portion = fixedPortion;
+				if (s != null) {
+					logger.debug("px:progress attribute ignored: " + s);
+				}
+			} else if (s == null)
 				portion = BigDecimal.ZERO;
 			else
 				try {
@@ -81,7 +90,12 @@ public class XProcMessageListenerHelper {
 					throw new XProcException("Not a valid number: " + s);
 				}
 		}
-		String severity = msg == null ? null : step.getExtensionAttribute(px_message_severity);
+		String severity;
+		if (msg == null) {
+			severity = null;
+		} else {
+			severity = step.getExtensionAttribute(px_message_severity);
+		}
 		XProcMessageListener listener = runtime.getMessageListener();
 		listener.openStep(step, step.getNode(), msg, severity, portion);
 	}
