@@ -8,6 +8,7 @@ import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.XdmNode;
 import net.sf.saxon.trans.XPathException;
 
+import java.math.BigDecimal;
 import javax.xml.transform.SourceLocator;
 import javax.xml.transform.TransformerException;
 import java.net.URI;
@@ -179,4 +180,9 @@ public class DefaultXProcMessageListener implements XProcMessageListener {
 
         return prefix + message;
     }
+
+    public void openStep(XProcRunnable step, XdmNode node, String message, String level, BigDecimal portion) {}
+
+    public void closeStep() {}
+
 }

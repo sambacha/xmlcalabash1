@@ -6,9 +6,7 @@ import com.xmlcalabash.core.XProcException;
 import com.xmlcalabash.core.XProcRuntime;
 import com.xmlcalabash.core.XProcStep;
 import com.xmlcalabash.core.XProcConstants;
-import com.xmlcalabash.core.XProcMessageListener;
 import com.xmlcalabash.model.RuntimeValue;
-import com.xmlcalabash.util.XProcMessageListenerHelper;
 import net.sf.saxon.s9api.*;
 import net.sf.saxon.trans.XPathException;
 
@@ -30,7 +28,6 @@ import com.xmlcalabash.util.S9apiUtils;
  * To change this template use File | Settings | File Templates.
  */
 public class DefaultStep implements XProcStep {
-    private static final String NS_DAISY_PIPELINE_XPROC = "http://www.daisy.org/ns/pipeline/xproc";
     
     public static final QName _byte_order_mark = new QName("", "byte-order-mark");
     public static final QName _cdata_section_elements = new QName("", "cdata-section-elements");
@@ -47,19 +44,15 @@ public class DefaultStep implements XProcStep {
     public static final QName _standalone = new QName("", "standalone");
     public static final QName _undeclare_prefixes = new QName("", "undeclare-prefixes");
     public static final QName _version = new QName("", "version");
-    public static final QName px_message = new QName("px", NS_DAISY_PIPELINE_XPROC, "message");
-    public static final QName px_message_severity = new QName("px", NS_DAISY_PIPELINE_XPROC, "message-severity");
 
     protected Logger logger = null;
     private Hashtable<QName,RuntimeValue> options = null;
     protected XProcRuntime runtime = null;
-    private XProcMessageListener msgListener = null;
     protected XAtomicStep step = null;
 
     public DefaultStep(XProcRuntime runtime, XAtomicStep step) {
         this.runtime = runtime;
         this.step = step;
-        this.msgListener = runtime.getMessageListener();
 
         Class impl = runtime.getConfiguration().implementations.get(step.getType());
         if (impl == null) {
@@ -172,24 +165,6 @@ public class DefaultStep implements XProcStep {
             type = step.getType().getClarkName();
         }
         logger.debug("Running " + type + " " + step.getName() + addnLog);
-
-        String msg = XProcMessageListenerHelper.evaluateExtensionAttribute(px_message, runtime, step);
-        if (msg != null) {
-            String severity = step.getExtensionAttribute(px_message_severity);
-            if (severity == null || severity.equals("INFO")) {
-                msgListener.info(this, step.getNode(), msg);
-            } else if (severity.equals("ERROR")) {
-                msgListener.error(this, step.getNode(), msg, null);
-            } else if (severity.equals("WARN")) {
-                msgListener.warning(this, step.getNode(), msg);
-            } else if (severity.equals("DEBUG")) {
-                msgListener.fine(this, step.getNode(), msg);
-            } else if (severity.equals("TRACE")) {
-                msgListener.finer(this, step.getNode(), msg);
-            } else {
-                msgListener.fine(this, step.getNode(), "Message with invalid severity '" + severity + "': " + msg);
-            }
-        }
     }
 
     public Serializer makeSerializer() {

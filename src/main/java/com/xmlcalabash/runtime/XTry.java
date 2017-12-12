@@ -5,6 +5,7 @@ import com.xmlcalabash.core.XProcConstants;
 import com.xmlcalabash.core.XProcException;
 import com.xmlcalabash.util.MessageFormatter;
 import com.xmlcalabash.util.TreeWriter;
+import com.xmlcalabash.util.XProcMessageListenerHelper;
 import com.xmlcalabash.io.WritablePipe;
 import com.xmlcalabash.model.*;
 import net.sf.saxon.om.StructuredQName;
@@ -99,6 +100,11 @@ public class XTry extends XCompoundStep {
         }
 
         try {
+            XProcMessageListenerHelper.openStep(runtime, this);
+        } catch (Throwable e) {
+            throw handleException(e);
+        }
+        try {
             xgroup.run();
         } catch (Exception xe) {
             
@@ -145,6 +151,8 @@ public class XTry extends XCompoundStep {
             }
 
             xcatch.run();
+        } finally {
+            runtime.getMessageListener().closeStep();
         }
     }
 
