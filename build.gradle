@@ -114,7 +114,7 @@ sourceSets {
 }
 
 // Variables
-project.ext.saxonRelease = saxonVersion.substring(0,5)
+project.ext.saxonRange = '[' + saxonVersion.substring(0,5) + ',' + saxonVersion.substring(0,4) + (saxonVersion.substring(4,5).toInteger() + 1) + ')'
 project.ext.saxonBranch  = saxonVersion.substring(0,3).replaceAll("\\.", "")
 project.ext.releaseVersion = version
 project.ext.distVersion = version + "-" + saxonBranch + snapshot
@@ -158,7 +158,7 @@ jar {
   com.nwalsh.annotations,\
   org.xmlresolver,\
   etc'
-    instruction 'Import-Package', 'net.sf.saxon.*;version=' + project.ext.saxonRelease + ',\
+    instruction 'Import-Package', 'net.sf.saxon.*;version="' + project.ext.saxonRange + '",\
   javax.crypto.*,\
   javax.xml.*,\
   org.apache.commons.httpclient.*,\
