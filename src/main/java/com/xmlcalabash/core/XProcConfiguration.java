@@ -390,10 +390,9 @@ public class XProcConfiguration {
         URI puri = home;
 
         String cfg = System.getProperty("com.xmlcalabash.config.global");
-        try {
-            InputStream instream = null;
-
-            if (cfg == null) {
+        if (cfg == null) {/*
+            try {
+                InputStream instream = null;
                 instream = getClass().getResourceAsStream("/etc/configuration.xml");
                 if (instream == null) {
                     throw new UnsupportedOperationException("Failed to load configuration from JAR file");
@@ -404,11 +403,11 @@ public class XProcConfiguration {
                 builder.setLineNumbering(true);
                 builder.setBaseURI(puri);
                 parse(builder.build(source));
-            } else {
-                parse(readXML(cfg, cwd.toASCIIString()));
-            }
-        } catch (SaxonApiException sae) {
-            throw new XProcException(sae);
+            } catch (SaxonApiException sae) {
+                throw new XProcException(sae);
+            }*/
+        } else {
+            parse(readXML(cfg, cwd.toASCIIString()));
         }
 
         cfg = System.getProperty("com.xmlcalabash.config.user", ".calabash");
