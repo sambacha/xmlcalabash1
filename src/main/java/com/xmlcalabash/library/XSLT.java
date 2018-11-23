@@ -34,15 +34,10 @@ import com.xmlcalabash.util.XProcCollectionFinder;
 import net.sf.saxon.Configuration;
 import net.sf.saxon.event.PipelineConfiguration;
 import net.sf.saxon.event.Receiver;
-import net.sf.saxon.expr.Expression;
-import net.sf.saxon.expr.FunctionCall;
-import net.sf.saxon.expr.instruct.Template;
 import net.sf.saxon.expr.instruct.TerminationException;
-import net.sf.saxon.expr.instruct.Instruction;
 import net.sf.saxon.expr.parser.Location;
 import net.sf.saxon.lib.CollectionFinder;
 import net.sf.saxon.lib.OutputURIResolver;
-import net.sf.saxon.lib.StandardErrorListener;
 import net.sf.saxon.lib.UnparsedTextURIResolver;
 import net.sf.saxon.om.NamespaceBindingSet;
 import net.sf.saxon.om.NodeName;
@@ -76,9 +71,7 @@ import javax.xml.transform.sax.SAXSource;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.Hashtable;
-import java.util.List;
 import java.util.Vector;
 
 /**
@@ -272,36 +265,23 @@ public class XSLT extends DefaultStep {
                     if (e instanceof TerminationException) {
                         message = catchMessages.getTerminatingMessage().toString();
                     }
-                    SourceLocator loc = ((TransformerException)e).getLocator();
-                    String instructionName; {
-                        if (loc instanceof Instruction)
-                            instructionName = StandardErrorListener.getInstructionName(((Instruction)loc));
-                        else if (loc instanceof FunctionCall)
-                            instructionName = ((FunctionCall)loc).getFunctionName().toString();
-                        else if (loc instanceof Template)
-                            instructionName = ((Template)loc).getTemplateName().toString();
-                        else
-                            instructionName = null;
-                    }
-                    final SourceLocator[] location = new SourceLocator[] {
-                        XProcException.prettyLocator(loc, instructionName)
-                    };
+                    final SourceLocator[] frames = XProcException.getLocator((TransformerException)e);
                     Throwable cause = e.getCause();
                     if (cause != null) {
                         if (cause instanceof XProcException)
-                            throw ((XProcException)cause).rebaseOnto(location);
+                            throw ((XProcException)cause).rebaseOnto(frames);
                         else
                             throw new XProcException(message, XProcException.javaError(cause, 0)) {
                                 @Override
                                 public SourceLocator[] getLocator() {
-                                    return location; }};
+                                    return frames; }};
                     } else
                         // passing e in order to provide some more details
                         // (but not wrapping it in an XProcException so that it doesn't appear in locator)
                         throw new XProcException(message, e) {
                             @Override
                             public SourceLocator[] getLocator() {
-                                return location; }};
+                                return frames; }};
                 } else
                     throw XProcException.javaError(sae, 0);
             }

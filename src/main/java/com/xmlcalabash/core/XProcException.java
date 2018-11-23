@@ -21,13 +21,41 @@ package com.xmlcalabash.core;
 
 import com.xmlcalabash.util.S9apiUtils;
 import com.xmlcalabash.util.URIUtils;
-import net.sf.saxon.s9api.QName;
 import com.xmlcalabash.model.Step;
-import net.sf.saxon.s9api.XdmNode;
 
+import net.sf.saxon.expr.instruct.Actor;
+import net.sf.saxon.expr.instruct.AttributeSet;
+import net.sf.saxon.expr.instruct.GlobalVariable;
+import net.sf.saxon.expr.instruct.Instruction;
+import net.sf.saxon.expr.instruct.NamedTemplate;
+import net.sf.saxon.expr.instruct.TemplateRule;
+import net.sf.saxon.expr.instruct.TerminationException;
+import net.sf.saxon.expr.instruct.UserFunction;
+import net.sf.saxon.expr.parser.ExplicitLocation;
+import net.sf.saxon.expr.parser.XPathParser;
+import net.sf.saxon.expr.XPathContext;
+import net.sf.saxon.lib.NamespaceConstant;
+import net.sf.saxon.lib.StandardErrorListener;
+import net.sf.saxon.om.Item;
+import net.sf.saxon.om.NodeInfo;
+import net.sf.saxon.om.StructuredQName;
+import net.sf.saxon.s9api.QName;
+import net.sf.saxon.s9api.XdmNode;
+import net.sf.saxon.trace.ContextStackFrame;
+import net.sf.saxon.trace.ContextStackIterator;
+import net.sf.saxon.trans.KeyDefinition;
+import net.sf.saxon.trans.XPathException;
+import net.sf.saxon.tree.AttributeLocation;
+import net.sf.saxon.tree.util.Navigator;
+import net.sf.saxon.type.ValidationException;
+
+import javax.xml.transform.dom.DOMLocator;
 import javax.xml.transform.SourceLocator;
+import javax.xml.transform.TransformerException;
+
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
@@ -394,6 +422,26 @@ public class XProcException extends RuntimeException {
         };
     }
 
+    public static SourceLocator prettyLocator(final String systemId, final int lineNumber, final String instructionName) {
+        return new XMLLocationWithInstructionName() {
+            public String getPublicId() {
+                return null;
+            }
+            public String getSystemId() {
+                return systemId;
+            }
+            public int getLineNumber() {
+                return lineNumber;
+            }
+            public int getColumnNumber() {
+                return -1;
+            }
+            protected String getInstructionName() {
+                return instructionName;
+            }
+        };
+    }
+    
     private static class XMLLocation extends XMLLocationWithInstructionName {
         private int line = -1;
         private int col = -1;
@@ -451,21 +499,136 @@ public class XProcException extends RuntimeException {
         public String toString() {
             StringBuilder s = new StringBuilder();
             String instructionName = getInstructionName();
-            if (instructionName != null)
-                s.append(instructionName);
-            s.append("(");
             String fileName = getSystemId();
-            if (fileName != null) {
+            if (fileName != null && !"".equals(fileName)) {
                 if (fileName.lastIndexOf('/') >= 0)
                     fileName = fileName.substring(fileName.lastIndexOf('/') + 1);
                 s.append(fileName);
                 int line = getLineNumber();
                 if (line > 0)
                     s.append(":" + getLineNumber());
-            } else
+            }
+            if (instructionName != null && !"".equals(instructionName)) {
+                if (s.length() > 0)
+                    s.insert(0, instructionName + "(").append(")");
+                else
+                    s.append(instructionName);
+            } else if (s.length() == 0)
                 s.append("?");
-            s.append(")");
             return s.toString();
+        }
+    }
+
+    public static SourceLocator[] getLocator(TransformerException e) {
+
+        // This code is inspired by StandardErrorListener
+        List<SourceLocator> frames = new ArrayList<SourceLocator>();
+        SourceLocator loc = e.getLocator();
+        if (loc == null) {
+            TransformerException err = e;
+            while (loc == null) {
+                if (err.getException() instanceof TransformerException) {
+                    err = (TransformerException)err.getException();
+                    loc = err.getLocator();
+                } else if (err.getCause() instanceof TransformerException) {
+                    err = (TransformerException)err.getCause();
+                    loc = err.getLocator();
+                } else {
+                    break;
+                }
+            }
+        }
+        if (loc == null)
+            loc = ExplicitLocation.UNKNOWN_LOCATION;
+        if (loc instanceof XPathParser.NestedLocation)
+            loc = ((XPathParser.NestedLocation)loc).getContainingLocation();
+        String instructionName = getInstructionName(loc);
+        if (instructionName == null && e instanceof TerminationException)
+            instructionName = "xsl:message";
+        loc = XProcException.prettyLocator(loc, instructionName);
+        frames.add(loc);
+
+        // now add more frames based on XPathContext
+        if (e instanceof XPathException) {
+            XPathException xe = (XPathException)e;
+            XPathContext ctxt = xe.getXPathContext();
+            if (ctxt != null) {
+                Iterator<ContextStackFrame> ff = new ContextStackIterator(xe.getXPathContext());
+                while (ff.hasNext()) {
+                    ContextStackFrame f = ff.next();
+                    instructionName = getInstructionName(f);
+                    if (instructionName != null)
+                        frames.add(XProcException.prettyLocator(f.getSystemId(), f.getLineNumber(), instructionName));
+                }
+            }
+        }
+        return frames.toArray(new SourceLocator[frames.size()]);
+    }
+
+    private static String getInstructionName(SourceLocator loc) {
+        if (loc instanceof AttributeLocation) {
+            return ((AttributeLocation)loc).getElementName().getDisplayName() + "/@"
+                + ((AttributeLocation)loc).getAttributeName();
+        } else if (loc instanceof DOMLocator) {
+            return ((DOMLocator)loc).getOriginatingNode().getNodeName();
+        } else if (loc instanceof NodeInfo) {
+            return ((NodeInfo)loc).getDisplayName();
+        } else if (loc instanceof ValidationException && ((ValidationException)loc).getNode() != null) {
+            return (((ValidationException)loc).getNode()).getDisplayName();
+        } else if (loc instanceof Instruction) {
+            return StandardErrorListener.getInstructionName((Instruction)loc);
+        } else if (loc instanceof Actor) {
+            return getInstructionName((Actor)loc);
+        } else {
+            return null;
+        }
+    }
+
+    private static String getInstructionName(ContextStackFrame frame) {
+        if (frame instanceof ContextStackFrame.FunctionCall) {
+            StructuredQName name = ((ContextStackFrame.FunctionCall)frame).getFunctionName();
+            if (name != null)
+                return name.getClarkName() + "()";
+        } else if (frame instanceof ContextStackFrame.ApplyTemplates) {
+            String name = "xsl:apply-templates";
+            Item node = frame.getContextItem();
+            if (node instanceof NodeInfo)
+                name += " processing " + Navigator.getPath((NodeInfo)node);
+            return name;
+        } else if (frame instanceof ContextStackFrame.CallTemplate) {
+            return "xsl:call-template name=\""
+                + ((ContextStackFrame.CallTemplate)frame).getTemplateName().getDisplayName() + "\"";
+        } else if (frame instanceof ContextStackFrame.VariableEvaluation) {
+            Object container = frame.getContainer();
+            if (container instanceof Actor) {
+                return getInstructionName((Actor)container);
+            } else if (container instanceof TemplateRule) {
+                return "xsl:template match=\"" + ((TemplateRule)container).getMatchPattern().toString() + "\"";
+            }
+        }
+        return null;
+    }
+
+    private static String getInstructionName(Actor actor) {
+        StructuredQName name = actor.getObjectName();
+        String objectName = name == null ? "" : name.getDisplayName();
+        if (actor instanceof UserFunction) {
+            return "function " + objectName + "()";
+        } else if (actor instanceof NamedTemplate) {
+            return "template name=\"" + objectName + "\"";
+        } else if (actor instanceof AttributeSet) {
+            return "attribute-set " + objectName;
+        } else if (actor instanceof KeyDefinition) {
+            return "key " + objectName;
+        } else if (actor instanceof GlobalVariable) {
+            StructuredQName qName = ((GlobalVariable)actor).getVariableQName();
+            if (qName.hasURI(NamespaceConstant.SAXON_GENERATED_VARIABLE)) {
+                return "optimizer-created global variable";
+            } else {
+                return "global variable $" + qName.getDisplayName();
+            }
+        } else {
+            return "procedure " + objectName;
         }
     }
 }
