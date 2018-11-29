@@ -396,7 +396,10 @@ public class XProcConfiguration {
             if (cfg == null) {
                 instream = getClass().getResourceAsStream("/etc/configuration.xml");
                 if (instream == null) {
-                    throw new UnsupportedOperationException("Failed to load configuration from JAR file");
+                    // This may happen in OSGi.
+                    // Because /etc/configuration.xml is empty anyway, we ignore this error.
+                    return;
+                    // throw new UnsupportedOperationException("Failed to load configuration from JAR file");
                 }
                 // No resolver, we don't have one yet
                 SAXSource source = new SAXSource(new InputSource(instream));
