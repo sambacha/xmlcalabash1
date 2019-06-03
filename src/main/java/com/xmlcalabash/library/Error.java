@@ -48,6 +48,9 @@ public class Error extends DefaultStep {
     private static final QName _code_prefix = new QName("code-prefix");
     private static final QName _code_namespace = new QName("code-namespace");
     private static final QName _type = new QName("type");
+    private static final QName _href = new QName("", "href");
+    private static final QName _line = new QName("", "line");
+    private static final QName _column = new QName("", "column");
     private ReadablePipe source = null;
 
     /* Creates a new instance of Delete */
@@ -116,10 +119,25 @@ public class Error extends DefaultStep {
         treeWriter.addAttribute(_name, step.getName());
         treeWriter.addAttribute(_type, "p:error");
         treeWriter.addAttribute(_code, errorCode.toString());
+
+        XdmNode node = step.getStep().getNode();
+        if (node != null) {
+            if (node.getBaseURI() != null)
+                treeWriter.addAttribute(_href, node.getBaseURI().toString());
+            if (node.getLineNumber() > 0)
+                treeWriter.addAttribute(_line, ""+node.getLineNumber());
+            if (node.getColumnNumber() > 0)
+                treeWriter.addAttribute(_column, ""+node.getColumnNumber());
+        }
+
         treeWriter.startContent();
         if (doc != null) {
             treeWriter.addSubtree(doc);
         }
+        // FIXME: locator is not complete yet, this happens during "rebaseOnto" when the exception is caught
+        // -> better to report where it is caught?
+        // -> need better solution to replace the "rebaseOnto" trick
+        XProcException.serializeLocator(e.getLocator(), treeWriter);
         treeWriter.addEndElement();
         treeWriter.endDocument();
 

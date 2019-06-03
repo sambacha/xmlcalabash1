@@ -20,6 +20,7 @@
 package com.xmlcalabash.core;
 
 import com.xmlcalabash.util.S9apiUtils;
+import com.xmlcalabash.util.TreeWriter;
 import com.xmlcalabash.util.URIUtils;
 import com.xmlcalabash.model.Step;
 
@@ -66,6 +67,16 @@ import java.util.Objects;
 public class XProcException extends RuntimeException {
     public static final QName err_E0001 = new QName(XProcConstants.NS_XPROC_ERROR_EX, "XE0001"); // invalid pipeline
     public static final QName err_E0002 = new QName(XProcConstants.NS_XPROC_ERROR_EX, "XE0002"); // invalid configuration
+
+    private static final String NS_DAISY_PIPELINE_XPROC = "http://www.daisy.org/ns/pipeline/xproc";
+    private static final QName c_error = new QName("c", XProcConstants.NS_XPROC_STEP, "error");
+    private static final QName _href = new QName("", "href");
+    private static final QName _line = new QName("", "line");
+    private static final QName _column = new QName("", "column");
+    private static final QName _code = new QName("", "code");
+    private static final QName px_cause = new QName("px", NS_DAISY_PIPELINE_XPROC, "cause");
+    private static final QName px_location = new QName("px", NS_DAISY_PIPELINE_XPROC, "location");
+    private static final QName px_file = new QName("px", NS_DAISY_PIPELINE_XPROC, "file");
 
     private QName error = null;
     private Step step = null;
@@ -670,5 +681,61 @@ public class XProcException extends RuntimeException {
     @Override
     public String toString() {
         return printEnclosedLocation(new SourceLocator[]{});
+    }
+    
+    public static void serializeLocator(SourceLocator[] locator, TreeWriter writer) {
+        if (locator.length > 0) {
+            writer.addStartElement(px_location);
+            writer.startContent();
+            for (SourceLocator l : locator) {
+                writer.addStartElement(px_file);
+                writer.addAttribute(_href, l.getSystemId());
+                int line = l.getLineNumber();
+                if (line > 0)
+                    writer.addAttribute(_line, ""+line);
+                writer.addEndElement();
+            }
+            writer.addEndElement();
+        }
+    }
+    
+    public void serialize(TreeWriter writer) {
+        writer.addStartElement(c_error);
+        QName code = getErrorCode();
+        if (code != null) {
+            StructuredQName qCode = new StructuredQName(code.getPrefix(), code.getNamespaceURI(), code.getLocalName());
+            writer.addNamespace(qCode.getPrefix(), qCode.getNamespaceBinding().getURI());
+            writer.addAttribute(_code, qCode.getDisplayName());
+        }
+        Step step = getStep();
+        if (step != null) {
+            XdmNode node = step.getNode();
+            if (node != null) {
+                if (node.getBaseURI() != null)
+                    writer.addAttribute(_href, node.getBaseURI().toString());
+                if (node.getLineNumber() > 0)
+                    writer.addAttribute(_line, ""+node.getLineNumber());
+                if (node.getColumnNumber() > 0)
+                    writer.addAttribute(_column, ""+node.getColumnNumber());
+            }
+        }
+        writer.startContent();
+        String message = getMessage();
+        if (message == null) {
+            Throwable underlying = getCause();
+            if (underlying != null && !(underlying instanceof XProcException))
+                message = underlying.getMessage();
+        }
+        if (message != null)
+            writer.addText(message);
+        serializeLocator(getLocator(), writer);
+        XProcException underlying = getXProcCause();
+        if (underlying != null) {
+            writer.addStartElement(px_cause);
+            writer.startContent();
+            underlying.serialize(writer);
+            writer.addEndElement();
+        }
+        writer.addEndElement();
     }
 }
